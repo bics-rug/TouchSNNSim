@@ -1,5 +1,3 @@
-import torch
-import torch.nn as nn
 import snntorch as snn
 from bicsnn.models import *
 from input.Sin import *
@@ -56,7 +54,7 @@ def plot_spk_cur_mem_spk(in_data, in_tde, gain, epsc, mem, spk, thr_line=False, 
 
     # Plot membrane potential
     ax[4].plot(mem.detach().cpu().numpy())
-    ax[4].set_ylabel("Membrane Potential ($U_{mem}$)")
+    ax[4].set_ylabel("$U_{mem}$")
     if thr_line:
         ax[4].axhline(y=thr_line, alpha=0.25, linestyle="dashed", c="black", linewidth=2)
     plt.xlabel("Time step")
@@ -77,18 +75,17 @@ def plot_snn_spikes(spk_in, lif_spk, tde_spk, num_steps, title):
                            gridspec_kw={'height_ratios': [1, 1, 1]})
 
     # Plot input spikes
-    splt.raster(spk_in[:, 0], ax[0], s=10, c="black")
+    splt.raster(spk_in[:, 0], ax[0], s=10, marker='|', c="black")
     ax[0].set_ylabel("Input Spikes")
     ax[0].set_title(title)
 
-    splt.raster(lif_spk.reshape(num_steps, -1), ax[1], s=10, c="black")
+    splt.raster(lif_spk.reshape(num_steps, -1), ax[1], s=10, marker='|', c="black")
     ax[1].set_ylabel("LIF")
 
-    splt.raster(tde_spk.reshape(num_steps, -1), ax[2], s=10, c="black")
+    splt.raster(tde_spk.reshape(num_steps, -1), ax[2], s=10, marker='|', c="black")
     ax[2].set_ylabel("TDE")
 
     return
-
 
 class Net_OnOff(nn.Module):
     #def __init__(self, num_inputs, num_hidden, num_outputs, num_steps, beta, weight):
@@ -145,32 +142,57 @@ class Net_OnOff(nn.Module):
                      'spks':[torch.stack(lif_spk_rec[1:], dim=0)]}
                  })
 
-def net_lif_simulation():
-    # Parameters network
+# def net_lif_simulation():
+#     # Parameters network
+#     num_steps = 200  # t steps
+#     batch_size = 1
+#
+#     # layer parameters
+#     spike_prob = 0.3
+#
+#     net = Net_OnOff(num_steps)
+#     # Input
+#     spk_in = spikegen.rate_conv(torch.rand((num_steps, 2)) * spike_prob).unsqueeze(1)
+#
+#     traces_rec = net(spk_in.view(num_steps, batch_size, -1))
+#
+#     plot_snn_spikes(spk_in, traces_rec['lif']['spks'][0], traces_rec['tde']['spks'][0], num_steps,
+#                     "In(ON-OFF) --> LIF (with inh) --> TDE")
+#     # splt.traces(traces_rec['mem'][0].reshape(num_steps, -1), dim=[10,1])
+#
+#     plot_spk_cur_mem_spk(spk_in[:, 0, :].reshape(num_steps, -1), traces_rec['lif']['spks'][0].reshape(num_steps, -1),
+#                          traces_rec['tde']['gain'][0][..., 0].reshape(num_steps, -1),
+#                          traces_rec['tde']['epsc'][0][..., 0].reshape(num_steps, -1),
+#                          traces_rec['tde']['mem'][0][..., 0].reshape(num_steps, -1),
+#                          traces_rec['tde']['spks'][0][..., 0].reshape(num_steps, -1), ylim_max1=1.25, ylim_max2=1.25)
+#     plt.show()
+
+def sin_in_simulation():
+    # Network parameters
     num_steps = 200  # t steps
+    w = 10 # Amplitude
+    T = 10 # Period
+    thr = 3 # Threshold
     batch_size = 1
 
-    # layer parameters
-    spike_prob = 0.3
+    # Model instantiation
+    model = Net_OnOff(num_steps)
+    output = model(sin_enc(w,T,thr,num_steps).view(num_steps, batch_size, -1))
 
-    net = Net_OnOff(num_steps)
-    # Input
-    spk_in = spikegen.rate_conv(torch.rand((num_steps, 2)) * spike_prob).unsqueeze(1)
+    # Data extraction
+    lif_spks = output['lif']['spks'][0]
+    tde_spks = output['tde']['spks'][0]
 
-    traces_rec = net(spk_in.view(num_steps, batch_size, -1))
-
-    plot_snn_spikes(spk_in, traces_rec['lif']['spks'][0], traces_rec['tde']['spks'][0], num_steps,
-                    "In(ON-OFF) --> LIF (with inh) --> TDE")
-    # splt.traces(traces_rec['mem'][0].reshape(num_steps, -1), dim=[10,1])
-
-    plot_spk_cur_mem_spk(spk_in[:, 0, :].reshape(num_steps, -1), traces_rec['lif']['spks'][0].reshape(num_steps, -1),
-                         traces_rec['tde']['gain'][0][..., 0].reshape(num_steps, -1),
-                         traces_rec['tde']['epsc'][0][..., 0].reshape(num_steps, -1),
-                         traces_rec['tde']['mem'][0][..., 0].reshape(num_steps, -1),
-                         traces_rec['tde']['spks'][0][..., 0].reshape(num_steps, -1), ylim_max1=1.25, ylim_max2=1.25)
+    # Plotting
+    plot_snn_spikes(sin_enc(w,T,thr,num_steps), lif_spks, tde_spks, num_steps, "In(ON-OFF) --> LIF (with inh) --> TDE")
+    plot_spk_cur_mem_spk(sin_enc(w,T,thr,num_steps).reshape(num_steps,-1),
+                            lif_spks.reshape(num_steps,-1),
+                            output['tde']['gain'][0][...,0].reshape(num_steps,-1),
+                            output['tde']['epsc'][0][...,0].reshape(num_steps,-1),
+                            output['tde']['mem'][0][...,0].reshape(num_steps,-1),
+                            tde_spks[...,0].reshape(num_steps,-1), ylim_max1=1.25, ylim_max2=1.25)
     plt.show()
 
-
 if __name__ == '__main__':
-    net_lif_simulation()
+    sin_in_simulation()
 
