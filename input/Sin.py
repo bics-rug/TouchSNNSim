@@ -54,7 +54,7 @@ def plot_onoff_spk(spk_on,spk_off, w, num_steps, title=False):
 def sin_enc(w, period, threshold, num_steps):
     #Define the input stimulus.
     omega = 2*torch.pi/period
-    sin_in = torch.sin(omega*torch.arange(0,num_steps,1))
+    sin_in = torch.cos(omega*torch.arange(0,num_steps,1))
     cur_in = w*sin_in
 
     #Plot the input stimulus.
@@ -62,8 +62,8 @@ def sin_enc(w, period, threshold, num_steps):
 
     #Spike data delta-mod.
     spk_data = spikegen.delta(cur_in,threshold=threshold,off_spike=True)
-    on_spks = torch.Tensor([0 if i == -1 else i for i in spk_data])
-    off_spks = torch.Tensor([0 if i == 1 else i for i in spk_data])
+    on_spks = torch.Tensor([0 if i == -1 else 1 for i in spk_data])
+    off_spks = torch.Tensor([0 if i == 1 else 1 for i in spk_data])
 
     # Formatted spike data.
     spk_data_out = torch.zeros((num_steps,1,2))
@@ -73,7 +73,7 @@ def sin_enc(w, period, threshold, num_steps):
     #Plot the on and off spikes.
     #plot_onoff_spk(on_spks,off_spks,w,num_steps,"Spike encoding through $\delta$-Modulation")
 
-    return spk_data_out
+    return spk_data_out, cur_in
 
 
 
