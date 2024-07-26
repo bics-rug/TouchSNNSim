@@ -140,11 +140,37 @@ def plot_spkr_inr(neuron, func_in, net_output, avg_spk_rate, num_steps, batch_si
     poly_fit = np.polyfit(inr_lst,npspkr_lst[:,0],3)
 
     plt.errorbar(inr_lst,npspkr_lst[:,0],npspkr_lst[:,1],c='black',marker='o',ls='none')
-    plt.plot(inr_lst,np.polyval(poly_fit,inr_lst),c='red',label='Polynomial Fit')
     plt.xlabel("$f_{in}$ [kHz]")
     plt.ylabel("Average Spiking Rate [kHz]")
     plt.title(title)
     plt.show()
+
+def plot_onoff_tde_lif(input,T,net_output, num_steps, batch_size):
+    fig, ax = plt.subplots(3, figsize=(12, 5), sharex=True, gridspec_kw={'height_ratios': [0.4, 0.4, 0.4]})
+    # Plot input spikes
+    on_spks = input[:, :, 0]
+    off_spks = input[:, :, 1]
+    splt.raster(on_spks, ax[0], s=400, marker='|', c="green")
+    splt.raster(off_spks, ax[0], s=400, marker='|', c="red")
+    ax[0].set_ylabel("Input Spikes")
+
+    # Plot LIF spikes with on/off colored green/red.
+    lif_spk = net_output(input, num_steps, batch_size)['lif']['spks'][0]
+    on_spks_lif = lif_spk[:, :, 0]
+    off_spks_lif = lif_spk[:, :, 1]
+    splt.raster(on_spks_lif, ax[1], s=400, marker='|', c="green")
+    splt.raster(off_spks_lif, ax[1], s=400, marker='|', c="red")
+    ax[1].set_ylabel("LIF Spikes")
+
+    # Plot TDE spikes
+    tde_spk = net_output(input, num_steps, batch_size)['tde']['spks'][0]
+    splt.raster(tde_spk, ax[2], s=400, marker='|', c="black")
+    ax[2].set_ylabel("TDE Spikes")
+    ax[2].set_xlabel("Time step")
+
+    fig.suptitle(f"Encoded Input --> LIF --> TDE Raster Plots ({round(1/T,2)} [kHz], $w = -7$)", fontsize=20)
+    plt.show()
+
 
 class Net_OnOff(nn.Module):
     #def __init__(self, num_inputs, num_hidden, num_outputs, num_steps, beta, weight):
@@ -156,7 +182,7 @@ class Net_OnOff(nn.Module):
         self.fc1.initialize(1, type='eye_conn')
         self.lif = snn.Leaky(beta=0.98, output=True)
         self.inh = Weight_synapse(2, 2, bias=False)
-        self.inh.initialize(-0.9, type='eye_conn')
+        self.inh.initialize(-7, type='eye_conn')
         # We can add a synaptic operation here later if we want to modulate input of TDE
         self.tde1 = TDE_neuron(1)
         self.num_steps = num_steps
@@ -190,15 +216,15 @@ class Net_OnOff(nn.Module):
             tde_epsc_rec.append(state.epsc)
             tde_mem_rec.append(state.mem)
 
-        return ({'tde':{
+        return ({'tde': {
                      'spks': [torch.stack(tde_spk_rec, dim=0)],
                      'gain': [torch.stack(tde_gain_rec, dim=0)],
                      'epsc': [torch.stack(tde_epsc_rec, dim=0)],
                      'mem': [torch.stack(tde_mem_rec, dim=0)]},
-                 'lif':{
-                     'cur':[torch.stack(lif_curin_rec, dim=0)],
-                     'mem':[torch.stack(lif_mem_rec, dim=0)],
-                     'spks':[torch.stack(lif_spk_rec[1:], dim=0)]}
+                 'lif': {
+                     'cur': [torch.stack(lif_curin_rec, dim=0)],
+                     'mem': [torch.stack(lif_mem_rec, dim=0)],
+                     'spks': [torch.stack(lif_spk_rec[1:], dim=0)]}
                  })
 
 # def net_lif_simulation():
@@ -228,7 +254,6 @@ class Net_OnOff(nn.Module):
 
 def net_output(input, num_steps, batch_size):
     model = Net_OnOff(num_steps)
-    print(input.view(num_steps, batch_size, -1))
     output = model(input.view(num_steps, batch_size, -1))
     return output
 
@@ -246,7 +271,7 @@ def sin_in_simulation():
     # Network parameters
     num_steps = 200  # t steps
     w = 10 # Amplitude
-    T = 10 # Period
+    T = 30 # Period
     thr = 1 # Threshold
     batch_size = 1
 
@@ -258,19 +283,21 @@ def sin_in_simulation():
     tde_spks = output['tde']['spks'][0]
 
     # Plotting
-    plot_snn_spikes(sin_enc(w,T,thr,num_steps)[0], lif_spks, tde_spks, num_steps, "In(ON-OFF) --> LIF (with inh) --> TDE")
-    plot_spk_cur_mem_spk(sin_enc(w,T,thr,num_steps)[0].reshape(num_steps,-1),
-                            lif_spks.reshape(num_steps,-1),
-                            output['tde']['gain'][0][...,0].reshape(num_steps,-1),
-                            output['tde']['epsc'][0][...,0].reshape(num_steps,-1),
-                            output['tde']['mem'][0][...,0].reshape(num_steps,-1),
-                            tde_spks[...,0].reshape(num_steps,-1), ylim_max1=1.25, ylim_max2=1.25)
-    plot_freq_mempot(sin_enc, [0.75, 0.85, 0.95], net_output, num_steps, batch_size, thr, w, "Sinuoidal Frequency Modulated Response of TDE Neuron")
-    plot_spkr_inr('lif', sin_enc, net_output, avg_spk_rate, num_steps, batch_size, thr, w, "Average Spiking Rate of LIF Neuron as a function of $f_{in}$")
+    #plot_snn_spikes(sin_enc(w,T,thr,num_steps)[0], lif_spks, tde_spks, num_steps, "In(ON-OFF) --> LIF (with inh) --> TDE")
+    #plot_spk_cur_mem_spk(sin_enc(w,T,thr,num_steps)[0].reshape(num_steps,-1),
+                            #lif_spks.reshape(num_steps,-1),
+                            #output['tde']['gain'][0][...,0].reshape(num_steps,-1),
+                            #output['tde']['epsc'][0][...,0].reshape(num_steps,-1),
+                            #output['tde']['mem'][0][...,0].reshape(num_steps,-1),
+                            #tde_spks[...,0].reshape(num_steps,-1), ylim_max1=1.25, ylim_max2=1.25)
+    #plot_freq_mempot(sin_enc, [0.75, 0.85, 0.95], net_output, num_steps, batch_size, thr, w, "Sinuoidal Frequency Modulated Response of TDE Neuron")
+    plot_spkr_inr('lif', sin_enc, net_output, avg_spk_rate, num_steps, batch_size, thr, w, "Spiking Rate of LIF Neuron as a function of $f_{in}$")
+    #plot_onoff_tde_lif(sin_enc(w,T,thr,num_steps)[0], T, net_output, num_steps, batch_size)
 
 
 if __name__ == '__main__':
-    #sin_in_simulation()
-    net_output(sin_enc(10, 10, 1, 200)[0], 200, 1)
+    sin_in_simulation()
+    #print(f'The spikes: {net_output(sin_enc(10,10,1,200)[0], 200, 1)['tde']['spks'][0]}')
+
 
 
