@@ -18,21 +18,27 @@ def check_cuda_avail():
     print(torch.cuda.get_device_name(0))
     return
 
-def plot_spk_cur_mem_spk(in_data, in_tde, gain, epsc, mem, spk, thr_line=False, vline=False, title=False, ylim_max1=1.25,
+def plot_spk_cur_mem_spk(in_data, in_tde, gain, epsc, mem, spk, thr_line=False, vline=False, ylim_max1=1.25,
                          ylim_max2=1.25):
     # Generate Plots
     fig, ax = plt.subplots(6, figsize=(12, 8), sharex=True,
                            gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 0.4]})
 
     # Plot output spike using spikeplot
-    splt.raster(in_data, ax[0], s=400, c="black", marker="|")
+    on_spks = in_data[:, 0, 0]
+    off_spks = in_data[:, 0, 1]
+    splt.raster(on_spks, ax[0], s=400, marker='|', c="green")
+    splt.raster(off_spks, ax[0], s=400, marker='|', c="red")
     if vline:
         ax[0].axvline(x=vline, ymin=0, ymax=6.75, alpha=0.15, linestyle="dashed", c="black", linewidth=2, zorder=0,
                       clip_on=False)
     ax[0].set_ylabel("Input spikes")
 
     # Plot output spike using spikeplot
-    splt.raster(in_tde, ax[1], s=400, c="black", marker="|")
+    on_spks = in_tde[:, 0, 0]
+    off_spks = in_tde[:, 0, 1]
+    splt.raster(off_spks, ax[1], s=400, marker='|', c="red")
+    splt.raster(on_spks, ax[1], s=400, marker='|', c="green")
     if vline:
         ax[1].axvline(x=vline, ymin=0, ymax=6.75, alpha=0.15, linestyle="dashed", c="black", linewidth=2, zorder=0,
                       clip_on=False)
@@ -67,6 +73,8 @@ def plot_spk_cur_mem_spk(in_data, in_tde, gain, epsc, mem, spk, thr_line=False, 
                       clip_on=False)
     ax[5].set_ylabel("Output")
     plt.yticks([])
+
+    fig.suptitle("LIF-TDE Characteristic Overwiew ($f_{in} = 100$ [Hz])", fontsize=20)
 
     return
 
@@ -168,7 +176,7 @@ def plot_onoff_tde_lif(input,T,net_output, num_steps, batch_size):
     ax[2].set_ylabel("TDE Spikes")
     ax[2].set_xlabel("Time step")
 
-    fig.suptitle(f"Encoded Input --> LIF --> TDE Raster Plots ({round(1/T,2)} [kHz], $w = -7$)", fontsize=20)
+    fig.suptitle(f"Encoded Input --> LIF --> TDE Raster Plots ({round(1/T,2)*10**3} [Hz])", fontsize=20)
     plt.show()
 
 
@@ -180,9 +188,9 @@ class Net_OnOff(nn.Module):
         # Initialize layers
         self.fc1 = Weight_synapse(2, 2, bias=False)
         self.fc1.initialize(1, type='eye_conn')
-        self.lif = snn.Leaky(beta=0.98, output=True)
+        self.lif = snn.Leaky(beta=0.8, output=True)
         self.inh = Weight_synapse(2, 2, bias=False)
-        self.inh.initialize(-7, type='eye_conn')
+        self.inh.initialize(-10, type='eye_conn')
         # We can add a synaptic operation here later if we want to modulate input of TDE
         self.tde1 = TDE_neuron(1)
         self.num_steps = num_steps
@@ -271,12 +279,13 @@ def sin_in_simulation():
     # Network parameters
     num_steps = 200  # t steps
     w = 10 # Amplitude
-    T = 30 # Period
-    thr = 1 # Threshold
+    T = 100 # Period
+    thr = 0.1 # Threshold
     batch_size = 1
 
     # Model instantiation
     output = net_output(sin_enc(w,T,thr,num_steps)[0], num_steps, batch_size)
+    output_triv = net_output(triv_sin_enc(num_steps), num_steps, batch_size)
 
     # Data extraction
     lif_spks = output['lif']['spks'][0]
@@ -284,15 +293,16 @@ def sin_in_simulation():
 
     # Plotting
     #plot_snn_spikes(sin_enc(w,T,thr,num_steps)[0], lif_spks, tde_spks, num_steps, "In(ON-OFF) --> LIF (with inh) --> TDE")
-    #plot_spk_cur_mem_spk(sin_enc(w,T,thr,num_steps)[0].reshape(num_steps,-1),
-                            #lif_spks.reshape(num_steps,-1),
-                            #output['tde']['gain'][0][...,0].reshape(num_steps,-1),
-                            #output['tde']['epsc'][0][...,0].reshape(num_steps,-1),
-                            #output['tde']['mem'][0][...,0].reshape(num_steps,-1),
-                            #tde_spks[...,0].reshape(num_steps,-1), ylim_max1=1.25, ylim_max2=1.25)
+    plot_spk_cur_mem_spk(sin_enc(w,T,thr,num_steps)[0],
+                            lif_spks,
+                            output['tde']['gain'][0][...,0].reshape(num_steps,-1),
+                            output['tde']['epsc'][0][...,0].reshape(num_steps,-1),
+                            output['tde']['mem'][0][...,0].reshape(num_steps,-1),
+                            tde_spks[...,0].reshape(num_steps,-1), ylim_max1=1.25, ylim_max2=1.25)
     #plot_freq_mempot(sin_enc, [0.75, 0.85, 0.95], net_output, num_steps, batch_size, thr, w, "Sinuoidal Frequency Modulated Response of TDE Neuron")
-    plot_spkr_inr('lif', sin_enc, net_output, avg_spk_rate, num_steps, batch_size, thr, w, "Spiking Rate of LIF Neuron as a function of $f_{in}$")
-    #plot_onoff_tde_lif(sin_enc(w,T,thr,num_steps)[0], T, net_output, num_steps, batch_size)
+    #plot_spkr_inr('lif', sin_enc, net_output, avg_spk_rate, num_steps, batch_size, thr, w, "Spiking Rate of LIF Neuron as a function of $f_{in}$")
+    plot_onoff_tde_lif(sin_enc(w,T,thr,num_steps)[0], T, net_output, num_steps, batch_size)
+    plt.show()
 
 
 if __name__ == '__main__':
