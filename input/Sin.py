@@ -4,6 +4,7 @@ import snntorch.spikeplot as splt
 from snntorch import spikegen
 import scipy.integrate as int
 import numpy as np
+from OnOff_Encoding import *
 
 #Plotting functions.
 def cur_in_plot(cur_in, input, w, T):
@@ -83,48 +84,15 @@ def sin_enc(w, period, threshold, num_steps):
 
     return spk_data_out, cur_in
 
-def triv_sin_enc(num_steps, plot=False):
-    spk_data_out = torch.zeros((num_steps,1,2))
-    for i in range(0,num_steps):
-        if i % 2 == 0:
-            spk_data_out[i,0,0] = 1
-            spk_data_out[i,0,1] = 0
-        else:
-            spk_data_out[i,0,1] = 1
-            spk_data_out[i,0,0] = 0
+def sin_enc_tp0(amplitude, period, threshold, num_steps):
+    # Define the input stimulus.
+    omega = 2 * torch.pi / period
+    sin_in = amplitude*torch.sin(omega * torch.arange(0, num_steps, 1))
 
-    if plot:
-        fig = plt.figure(facecolor='white', figsize=(10, 2))
-        ax = fig.add_subplot(111)
+    #spike data
+    time_list = sample_to_changes(np.expand_dims(sin_in, axis=1), num_steps, 1)
+    spk_seq = convert_to_seq(time_list, int(duration * sampling_rate))
 
-        on_spks = spk_data_out[:, 0, 0]
-        off_spks = spk_data_out[:, 0, 1]
-        splt.raster(on_spks, ax, s=400, marker='|', c="green")
-        splt.raster(off_spks, ax, s=400, marker='|', c="red")
-        plt.ylabel("Input Spikes")
-        ax.set_xlabel("Time steps [$ms$]")
-        plt.show()
-
-    return spk_data_out
-
-# def sin_prob(num_steps,period):
-#     omega = 2 * torch.pi / period
-#
-#     spk_data_out = torch.zeros((num_steps, 1, 2))
-#     on_spks = []
-#     off_spks = []
-#     for t_0 in range(0,num_steps):
-#         spk_data = int.quad(lambda t: np.cos(omega*t),t_0,t_0+t_0*np.pi/4*period)
-#         print(spk_data)
-#         if 0.0 >= spk_data[0] and 0.5 < spk_data[0]:
-#             on_spks.append(1)
-#         else:
-#             off_spks.append(0)
-#
-#         spk_data_out[:, 0, 0] = torch.tensor(on_spks)
-#         spk_data_out[:, 0, 1] = torch.tensor(off_spks)
-#
-#     return spk_data_out
 
 #Plotting the input spikes, coloured red and green.
 w = 10
