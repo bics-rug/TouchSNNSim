@@ -2,6 +2,7 @@ import numpy as np
 import snntorch as snn
 from bicsnn.models import *
 from input.Sin import *
+from input.OnOff_Encoding import *
 from snntorch import spikeplot as splt
 from snntorch import spikegen
 import matplotlib.pyplot as plt
@@ -279,13 +280,12 @@ def sin_in_simulation():
     # Network parameters
     num_steps = 200  # t steps
     w = 10 # Amplitude
-    T = 100 # Period
+    f = 10 # Period
     thr = 0.1 # Threshold
     batch_size = 1
 
     # Model instantiation
-    output = net_output(sin_enc(w,T,thr,num_steps)[0], num_steps, batch_size)
-    output_triv = net_output(triv_sin_enc(num_steps), num_steps, batch_size)
+    output = net_output(main_encoding()[0], num_steps, batch_size)
 
     # Data extraction
     lif_spks = output['lif']['spks'][0]
@@ -293,7 +293,7 @@ def sin_in_simulation():
 
     # Plotting
     #plot_snn_spikes(sin_enc(w,T,thr,num_steps)[0], lif_spks, tde_spks, num_steps, "In(ON-OFF) --> LIF (with inh) --> TDE")
-    plot_spk_cur_mem_spk(sin_enc(w,T,thr,num_steps)[0],
+    plot_spk_cur_mem_spk(main_encoding()[0],
                             lif_spks,
                             output['tde']['gain'][0][...,0].reshape(num_steps,-1),
                             output['tde']['epsc'][0][...,0].reshape(num_steps,-1),
@@ -301,7 +301,7 @@ def sin_in_simulation():
                             tde_spks[...,0].reshape(num_steps,-1), ylim_max1=1.25, ylim_max2=1.25)
     #plot_freq_mempot(sin_enc, [0.75, 0.85, 0.95], net_output, num_steps, batch_size, thr, w, "Sinuoidal Frequency Modulated Response of TDE Neuron")
     #plot_spkr_inr('lif', sin_enc, net_output, avg_spk_rate, num_steps, batch_size, thr, w, "Spiking Rate of LIF Neuron as a function of $f_{in}$")
-    plot_onoff_tde_lif(sin_enc(w,T,thr,num_steps)[0], T, net_output, num_steps, batch_size)
+    plot_onoff_tde_lif(main_encoding()[0], 1/f, net_output, num_steps, batch_size)
     plt.show()
 
 
