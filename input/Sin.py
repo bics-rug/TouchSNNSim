@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import snntorch.spikeplot as splt
 from snntorch import spikegen
+import scipy.integrate as int
 import numpy as np
 from OnOff_Encoding import *
 
@@ -83,36 +84,24 @@ def sin_enc(w, period, threshold, num_steps):
 
     return spk_data_out, cur_in
 
-def sin_enc_tp0(amplitude, frequency, threshold):
+def sin_enc_tp0(amplitude, period, threshold, num_steps):
     # Define the input stimulus.
-    omega = 2 * torch.pi * frequency
-    duration = 0.5
-    sampling_rate = 1000
-    samples = int(duration*sampling_rate)
-    sin_in = amplitude*np.sin(omega * np.linspace(0, duration, samples))
+    omega = 2 * torch.pi / period
+    sin_in = amplitude*torch.sin(omega * torch.arange(0, num_steps, 1))
 
     #spike data
-    time_list = sample_to_changes(np.expand_dims(sin_in, axis=1), samples, threshold)
-    spk_seq = convert_to_seq(time_list, samples)
-
-    # Output data
-    spk_data_out = torch.zeros((samples, 1, 2))
-    spk_data_out[:, 0, 0] = torch.tensor(spk_seq[0])
-    spk_data_out[:, 0, 1] = torch.tensor(spk_seq[1])
-
-    return spk_data_out
+    time_list = sample_to_changes(np.expand_dims(sin_in, axis=1), num_steps, 1)
+    spk_seq = convert_to_seq(time_list, int(duration * sampling_rate))
 
 
 #Plotting the input spikes, coloured red and green.
 w = 10
-f = 10
+T = 100
 
-on_spks = sin_enc_tp0(w,f,1)[:,0,0]
-print(on_spks)
-off_spks = sin_enc_tp0(w,f,1)[:,0,1]
-print(off_spks)
-
-plot_onoff_spk(on_spks,off_spks,w,500,"Spike encoding")
+cur_in_plot(sin_enc(w,T,0.5,200)[1],sin_enc(w,T,0.5,200)[0],w,200)
+# on_spks = sin_prob(200,T)[:,0,0]
+# off_spks = sin_prob(200,T)[:,0,1]
+# plot_onoff_spk(on_spks,off_spks,w,200,"Spike encoding")
 
 
 

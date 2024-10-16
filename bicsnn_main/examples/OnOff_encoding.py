@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 import snntorch as snn
-from bicsnn_main.bicsnn import *
+from bicsnn.models import *
 from snntorch import spikeplot as splt
 from snntorch import spikegen
 import matplotlib.pyplot as plt
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -154,33 +155,30 @@ def convert_to_seq(time_list, samples):
         event_list.append(event_t)
     return event_list
 
-def main_encoding(frequency, amplitude=5, duration=0.5, sampling_rate=1000):
-    samples = int(duration * sampling_rate)
+def main_encoding():
+    # Generate sinusoid
+    frequency = 10  # Hz
+    amplitude = 5
+    duration = 0.5  # seconds
+    sampling_rate = 1000  # samples/second
 
     wave = generate_sinusoidal_wave(frequency, amplitude, duration, sampling_rate)
     # Output is a list with timestamps of the events
-    time_list = sample_to_changes(np.expand_dims(wave, axis=1), sampling_rate,2.5)
+    time_list = sample_to_changes(np.expand_dims(wave, axis=1), sampling_rate,1)
     # Convert the timestamps to time sequence for convenience
-    spk_seq = convert_to_seq(time_list, samples)
+    spk_seq = convert_to_seq(time_list, int(duration * sampling_rate))
     data_en = spikegen.delta(torch.tensor(wave), threshold=0.1, padding=True, off_spike=True)
-
-    # Make torch tensor
-    spk_data_out = torch.zeros((samples, 1, 2))
-    spk_data_out[:, 0, 0] = torch.tensor(spk_seq[0])
-    spk_data_out[:, 0, 1] = torch.tensor(spk_seq[1])
-
-    return spk_data_out, samples, wave
-
-def plot_func_enc(on_spks, off_spks, wave):
-    fig, ax = plt.subplots(3, figsize=(12, 8), sharex=True,
-                           gridspec_kw={'height_ratios': [1, 0.4, 0.4]})
+    # Plot the wave
+    fig, ax = plt.subplots(4, figsize=(12, 8), sharex=True,
+                           gridspec_kw={'height_ratios': [1, 0.4, 0.4, 0.4]})
     ax[0].plot(wave)
-    ax[0].set_ylabel("Amplitude")
-    splt.raster(torch.tensor(on_spks), ax[1], s=400, c="green", marker="|")
-    splt.raster(torch.tensor(off_spks), ax[2], s=400, c="red", marker="|")
+    splt.raster(torch.tensor(spk_seq[0]), ax[1], s=400, c="black", marker="|")
+    splt.raster(torch.tensor(spk_seq[1]), ax[2], s=400, c="black", marker="|")
+    splt.raster(data_en, ax[3], s=400, c="black", marker="|")
     plt.xlabel("Time (samples 1ms)")
-    plt.suptitle("Sinusoidal Wave")
+    plt.ylabel("Amplitude")
+    plt.title("Sinusoidal Wave")
     plt.show()
 
 if __name__ == '__main__':
-    plot_func_enc(main_encoding()[0][:, 0, 0], main_encoding()[0][:, 0, 1], main_encoding()[2])
+    main_encoding()
